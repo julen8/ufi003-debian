@@ -1,23 +1,18 @@
 #!/bin/bash
 
+set -euo pipefail
+set -x
+
 DIST=trixie
 LANG_TARGET=en_US.UTF-8
-PASSWORD=1234
+PASSWORD=123456
 NAME=ufi003
 PARTUUID=a7ab80e8-e9d1-e8cd-f157-93f69b1d141e
 
 cat <<EOF > /etc/apt/sources.list
-deb http://deb.debian.org/debian/ $DIST main contrib non-free non-free-firmware
-# deb-src http://deb.debian.org/debian/ $DIST main contrib non-free non-free-firmware
-
-deb http://deb.debian.org/debian/ $DIST-updates main contrib non-free non-free-firmware
-# deb-src http://deb.debian.org/debian/ $DIST-updates main contrib non-free non-free-firmware
-
-deb http://deb.debian.org/debian/ $DIST-backports main contrib non-free non-free-firmware
-# deb-src http://deb.debian.org/debian/ $DIST-backports main contrib non-free non-free-firmware
-
-deb http://security.debian.org/debian-security $DIST-security main contrib non-free non-free-firmware
-# deb-src http://security.debian.org/debian-security $DIST-security main contrib non-free non-free-firmware
+deb http://mirrors.ustc.edu.cn/debian $DIST main contrib non-free non-free-firmware
+deb http://mirrors.ustc.edu.cn/debian $DIST-updates main contrib non-free non-free-firmware
+deb http://mirrors.ustc.edu.cn/debian-security/ $DIST-security main contrib non-free non-free-firmware
 EOF
 
 cat <<EOF > /etc/fstab
@@ -27,7 +22,8 @@ EOF
 
 apt-get update
 apt-get full-upgrade -y
-apt-get install -y locales network-manager openssh-server systemd-timesyncd fake-hwclock zram-tools rmtfs qrtr-tools
+#apt-get install -y rmtfs qrtr-tools # modem
+apt-get install -y locales network-manager openssh-server systemd-timesyncd fake-hwclock zram-tools bluetooth bluez vim
 apt-get install -y /tmp/*.deb
 sed -i -e "s/# $LANG_TARGET UTF-8/$LANG_TARGET UTF-8/" /etc/locale.gen
 dpkg-reconfigure --frontend=noninteractive locales
