@@ -7,7 +7,16 @@
 - 默认300% zram
 - boot-no-modem-oc.img内核超频至1.2GHz
 
-## 手动更换内核
+## 使用fastboot刷入:
+```shell
+adb reboot bootloader
+fastboot devices
+fastboot flash boot ./boot-no-modem-oc.img
+fastboot -S 200m flash rootfs ./rootfs.img
+fastboot reboot
+```
+
+## debian内手动更换内核
 ```shell
 cd /tmp
 wget KERN_DEB_URL
