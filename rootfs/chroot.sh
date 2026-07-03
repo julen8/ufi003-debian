@@ -4,15 +4,17 @@ set -euo pipefail
 set -x
 
 DIST=trixie
+DEBIAN_MIRROR="${DEBIAN_MIRROR:-http://deb.debian.org/debian}"
+DEBIAN_SECURITY_MIRROR="${DEBIAN_SECURITY_MIRROR:-http://deb.debian.org/debian-security}"
 LANG_TARGET=en_US.UTF-8
 PASSWORD=123456
 NAME=ufi003
 PARTUUID=a7ab80e8-e9d1-e8cd-f157-93f69b1d141e
 
 cat <<EOF > /etc/apt/sources.list
-deb http://mirrors.ustc.edu.cn/debian $DIST main contrib non-free non-free-firmware
-deb http://mirrors.ustc.edu.cn/debian $DIST-updates main contrib non-free non-free-firmware
-deb http://mirrors.ustc.edu.cn/debian-security/ $DIST-security main contrib non-free non-free-firmware
+deb $DEBIAN_MIRROR $DIST main contrib non-free non-free-firmware
+deb $DEBIAN_MIRROR $DIST-updates main contrib non-free non-free-firmware
+deb $DEBIAN_SECURITY_MIRROR $DIST-security main contrib non-free non-free-firmware
 EOF
 
 cat <<EOF > /etc/fstab
@@ -23,7 +25,7 @@ EOF
 apt-get update
 apt-get full-upgrade -y
 #apt-get install -y rmtfs qrtr-tools # modem
-apt-get install -y locales network-manager openssh-server systemd-timesyncd fake-hwclock zram-tools bluetooth bluez vim
+apt-get install -y locales network-manager openssh-server systemd-timesyncd fake-hwclock zram-tools vim
 apt-get install -y /tmp/*.deb
 sed -i -e "s/# $LANG_TARGET UTF-8/$LANG_TARGET UTF-8/" /etc/locale.gen
 dpkg-reconfigure --frontend=noninteractive locales

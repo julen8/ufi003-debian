@@ -1,51 +1,110 @@
-name: Build debian
-on: push
+name: Build Debian
+
+on:
+  push:
+    branches:
+      - "**"
+    tags:
+      - "**"
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
-    name: Build debian
+    name: Build Debian image
     runs-on: ubuntu-latest
-    steps:
-      - name: Prepare
-        run: |
-          sudo apt-get -y update
-          sudo apt-get -y install debootstrap binfmt-support qemu-user-static android-sdk-libsparse-utils
-          sudo apt-get -y install gcc-arm-none-eabi device-tree-compiler python3-pycryptodome
+    timeout-minutes: 360
 
+    steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Prepare repository
-        run: git config --global --add safe.directory "$(pwd)"
+      - name: Enable arm64 binfmt
+        run: docker run --privileged --rm tonistiigi/binfmt --install arm64
 
-      - name: Build rootfs
+      - name: Build in Debian 13
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
-          cd rootfs
-          sudo ./build.sh
-          sudo xz -T0 rootfs.img
+          docker run --privileged --rm \
+            -v "$PWD:/work" \
+            -w /work \
+            -e DEBIAN_FRONTEND=noninteractive \
+            -e DEBIAN_MIRROR=http://deb.debian.org/debian \
+            -e DEBIAN_SECURITY_MIRROR=http://deb.debian.org/debian-security \
+            -e GITHUB_TOKEN="$GITHUB_TOKEN" \
+            debian:trixie \
+            bash -lc '
+              set -euo pipefail
+              apt-get update
+              apt-get install -y \
+                ca-certificates \
+                device-tree-compiler \
+                gcc-arm-none-eabi \
+                git \
+                make \
+                patch \
+                python3 \
+                python3-cryptography \
+                xz-utils
+              git config --global --add safe.directory /work
+              cd rootfs
+              ./build.sh build
+              xz -T0 -f rootfs.img
+              cd ../aboot
+              ./build.sh
+            '
 
-      - name: Build bootloader
+      - name: Prepare artifact metadata
+        id: meta
         run: |
-          cd aboot
-          ./build.sh
+          set -euo pipefail
 
-      - name: Generate release tag
-        id: version
-        run: |
-          NAME=$(echo "Debian $(cat rootfs/debian_version)")
-          TAG_NAME=$(cat rootfs/debian_version)-${{ github.run_number }}
-          git tag $TAG_NAME
-          git push origin $TAG_NAME
-          echo -e "- Bootloader: $(cat aboot/ver.txt)\n$(cat rootfs/info.md)\n\n$(git log -1 --format=%B)" > release_notes.md
-          echo "NAME=$NAME" >> $GITHUB_OUTPUT
-          echo "TAG_NAME=$TAG_NAME" >> $GITHUB_OUTPUT
+          safe_ref="$(printf '%s' "${GITHUB_REF_NAME:-ref}" | tr '/:@ ' '----' | tr -cd 'A-Za-z0-9._-')"
+          if [[ -z "$safe_ref" ]]; then
+            safe_ref="ref"
+          fi
 
-      - name: Releases
+          release_name="Debian $(cat rootfs/debian_version)"
+          upload_name="ufi003-debian-${safe_ref}-${GITHUB_SHA::7}"
+
+          {
+            printf '## Debian\n\n'
+            printf '%s\n' "- Bootloader: $(cat aboot/ver.txt)"
+            cat rootfs/info.md
+            printf '\n'
+            cat rootfs/kernel-release-info.md
+            printf '\n\n'
+            printf '## Source commit\n\n'
+            git log -1 --format=%B
+          } > release_notes.md
+
+          echo "release_name=$release_name" >> "$GITHUB_OUTPUT"
+          echo "upload_name=$upload_name" >> "$GITHUB_OUTPUT"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.meta.outputs.upload_name }}
+          path: |
+            aboot/emmc_appsboot-test-signed.mbn
+            kernel/*.img
+            rootfs/rootfs.img.xz
+            rootfs/debian_version
+            rootfs/info.md
+            rootfs/kernel-release-info.md
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          name: ${{ steps.version.outputs.NAME }}
+          name: ${{ steps.meta.outputs.release_name }}
           body_path: release_notes.md
-          tag_name: ${{ steps.version.outputs.TAG_NAME }}
+          tag_name: ${{ github.ref_name }}
           files: |
             aboot/emmc_appsboot-test-signed.mbn
             kernel/*.img
