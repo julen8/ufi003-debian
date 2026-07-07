@@ -25,7 +25,7 @@ EOF
 apt-get update
 apt-get full-upgrade -y
 #apt-get install -y rmtfs qrtr-tools # modem
-apt-get install -y locales network-manager openssh-server systemd-timesyncd fake-hwclock zram-tools vim
+apt-get install -y locales network-manager openssh-server openssh-client systemd-timesyncd fake-hwclock zram-tools vim bc
 apt-get install -y /tmp/*.deb
 sed -i -e "s/# $LANG_TARGET UTF-8/$LANG_TARGET UTF-8/" /etc/locale.gen
 dpkg-reconfigure --frontend=noninteractive locales
